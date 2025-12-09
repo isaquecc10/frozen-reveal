@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Frozen Reveal</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --teal: #6fffe0;
+  }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: #ffffff;
+    font-family: 'Cinzel', serif;
+    color: var(--teal);
+    overflow: hidden;
+  }
+
+  #snowCanvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* NOVO — fundo que vai aparecer só depois */
+  #revealBg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    opacity: 0;                 /* invisível até revelar */
+    transition: opacity 3s ease; /* fade suave */
+    z-index: 1;                 /* atrás apenas da logo */
+    pointer-events: none;
+  }
+
+  .logo-wrap {
+    position: fixed;
+    top: 38%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    width: 80%;
+    max-width: 850px;
+  }
+
+  #logo {
+    width: 100%;
+    display: block;
+    opacity: 1;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  #fog {
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    pointer-events: none;
+    z-index: 3;
+    background: radial-gradient(circle at 50% 40%,
+      rgba(255,255,255,1) 20%,
+      rgba(255,255,255,0.95) 40%,
+      rgba(255,255,255,0.85) 58%,
+      rgba(255,255,255,0.65) 74%,
+      rgba(255,255,255,0.45) 84%,
+      rgba(255,255,255,0.25) 92%,
+      rgba(255,255,255,0.05) 100%);
+    filter: blur(50px);
+    opacity: 1;
+    transition: opacity 2.5s ease;
+  }
+
+  #countdown {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 2.2rem;
+    z-index: 4;
+    text-shadow: 0 0 10px rgba(0,255,200,0.4);
+  }
+
+  #playButton {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    font-family: 'Cinzel', serif;
+    background: #ff3d3d;
+    color: white;
+    border: none;
+    padding: 18px 32px;
+    font-size: 1.4rem;
+    border-radius: 12px;
+    cursor: pointer;
+    z-index: 4;
+    box-shadow: 0 0 20px rgba(255,0,0,0.45);
+  }
+</style>
+</head>
+<body>
+
+<canvas id="snowCanvas"></canvas>
+
+<!-- NOVO FUNDO -->
+<img id="revealBg" src="bg_reveal.png">
+
+<div class="logo-wrap">
+  <img id="logo" src="logo_blur1.png" draggable="false">
+</div>
+
+<div id="fog"></div>
+
+<div id="countdown">Loading…</div>
+
+<button id="playButton" onclick="window.location.href='https://www.roblox.com/share?code=da16b1284cdb1f48b6bc5e024cf758ea&type=ExperienceDetails&stamp=1765237009636'">
+  PLAY CHAPTER
+</button>
+
+<audio id="revealSound" src="reveal.mp3" preload="auto"></audio>
+
+<script>
+document.getElementById("logo").onerror = () => {
+  console.error("ERRO: A imagem NÃO carregou. Verifique se os arquivos PNG estão na MESMA pasta que o index.html.");
+};
+
+const preload = [];
+["logo_blur1.png","logo_blur2.png","logo_blur3.png","logo_blur4.png","logo.png","bg_reveal.png"]
+.forEach(src => {
+  const img = new Image();
+  img.src = src;
+  preload.push(img);
+});
+
+/* Datas originais */
+const freezeStart     = new Date("2025-12-09T14:00:00-03:00").getTime();
+const freezeEnd       = new Date("2025-12-10T14:00:00-03:00").getTime();
+const pauseEnd        = new Date("2025-12-10T15:01:00-03:00").getTime();
+const chapterRelease  = new Date("2025-12-24T17:00:00-03:00").getTime();
+
+const phaseImages = [
+  "logo_blur1.png",
+  "logo_blur2.png",
+  "logo_blur3.png",
+  "logo_blur4.png",
+  "logo.png"
+];
+
+const logo = document.getElementById("logo");
+const fog = document.getElementById("fog");
+const countdown = document.getElementById("countdown");
+const playBtn = document.getElementById("playButton");
+const revealSound = document.getElementById("revealSound");
+const revealBg = document.getElementById("revealBg");
+
+/* Snow */
+const c = document.getElementById("snowCanvas");
+const ctx = c.getContext("2d");
+let W = c.width = window.innerWidth;
+let H = c.height = window.innerHeight;
+
+window.onresize = () => {
+  W = c.width = window.innerWidth;
+  H = c.height = window.innerHeight;
+};
+
+let snow = [];
+
+function initSnow() {
+  snow = [];
+  let amount = Math.floor((W * H) / 2500);
+  for (let i = 0; i < amount; i++) {
+    snow.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 2 + 1,
+      s: Math.random() * 1 + 0.5
+    });
+  }
+}
+
+function drawSnow() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.beginPath();
+
+  for (let f of snow) {
+    ctx.moveTo(f.x, f.y);
+    ctx.arc(f.x, f.y, f.r, 0, Math.PI*2);
+  }
+
+  ctx.fill();
+  updateSnow();
+}
+
+function updateSnow() {
+  for (let f of snow) {
+    f.y += f.s;
+    if (f.y > H) {
+      f.y = -5;
+      f.x = Math.random() * W;
+    }
+  }
+}
+
+initSnow();
+setInterval(drawSnow, 33);
+
+/* Countdown */
+function fmt(ms) {
+  if (ms < 0) ms = 0;
+  let d = Math.floor(ms / 86400000);
+  let h = Math.floor(ms % 86400000 / 3600000);
+  let m = Math.floor(ms % 3600000 / 60000);
+  let s = Math.floor(ms % 60000 / 1000);
+  if (d > 0) return `${d}d ${h}h ${m}m ${s}s`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+let soundPlayed = false;
+let bgShown = false; // NOVO
+
+function update() {
+  let now = Date.now();
+
+  if (now < freezeStart) {
+    countdown.textContent = "Unfreezing starts in: " + fmt(freezeStart - now);
+    logo.src = phaseImages[0];
+    fog.style.opacity = 1;
+    return;
+  }
+
+  if (now >= freezeStart && now < freezeEnd) {
+    let p = (now - freezeStart) / (freezeEnd - freezeStart);
+    let index = Math.floor(p * 5);
+    if (index > 4) index = 4;
+
+    logo.src = phaseImages[index];
+    fog.style.opacity = 1 - (p * 0.9);
+
+    countdown.textContent = "Unfreezing in: " + fmt(freezeEnd - now);
+    return;
+  }
+
+  if (now >= freezeEnd && now < pauseEnd) {
+    logo.src = "logo.png";
+    fog.style.opacity = 0;
+
+    /* Som + fundo novo aqui */
+    if (!soundPlayed) {
+      revealSound.play().catch(()=>{});
+      soundPlayed = true;
+
+      /* NOVO — revelar fundo */
+      setTimeout(() => {
+        revealBg.style.opacity = 1;
+      }, 800); // aparece um pouco depois do som
+    }
+
+    countdown.textContent = "Revealed.";
+    return;
+  }
+
+  if (now >= pauseEnd && now < chapterRelease) {
+    logo.src = "logo.png";
+    fog.style.opacity = 0;
+
+    revealBg.style.opacity = 1;
+
+    countdown.textContent = "Releasing in: " + fmt(chapterRelease - now);
+    return;
+  }
+
+  if (now >= chapterRelease) {
+    logo.src = "logo.png";
+    fog.style.opacity = 0;
+
+    revealBg.style.opacity = 1;
+
+    countdown.textContent = "The chapter is now available!";
+    playBtn.style.display = "block";
+    return;
+  }
+}
+
+update();
+setInterval(update, 1000);
+</script>
+
+</body>
+</html>
